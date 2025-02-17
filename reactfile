@@ -1,0 +1,137 @@
+import React, { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectItem } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/datepicker";
+
+const CashAuditApp = () => {
+  const [date, setDate] = useState(new Date());
+  const [location, setLocation] = useState("");
+  const [shift, setShift] = useState("morning");
+  const [bills, setBills] = useState({
+    10000: 0,
+    5000: 0,
+    2000: 0,
+    1000: 0,
+  });
+  const [coins, setCoins] = useState({
+    500: 0,
+    100: 0,
+    50: 0,
+    10: 0,
+    5: 0,
+    1: 0,
+  });
+  const [rolledCoins, setRolledCoins] = useState({
+    500: 0,
+    100: 0,
+    50: 0,
+    10: 0,
+    5: 0,
+    1: 0,
+  });
+  const [checker, setChecker] = useState("");
+  const [verifier, setVerifier] = useState("");
+  const canvasRef = useRef(null);
+  const [signatures, setSignatures] = useState({ checker: "", verifier: "" });
+
+  useEffect(() => {
+    const formattedDate = date.toISOString().split("T")[0];
+    const savedData = JSON.parse(localStorage.getItem(`cashAudit_${formattedDate}`));
+    if (savedData) {
+      setLocation(savedData.location);
+      setShift(savedData.shift);
+      setBills(savedData.bills);
+      setCoins(savedData.coins);
+      setRolledCoins(savedData.rolledCoins);
+      setChecker(savedData.checker || "");
+      setVerifier(savedData.verifier || "");
+      setSignatures(savedData.signatures || { checker: "", verifier: "" });
+    }
+  }, [date]);
+
+  const saveData = () => {
+    const formattedDate = date.toISOString().split("T")[0];
+    const data = {
+      location,
+      shift,
+      bills,
+      coins,
+      rolledCoins,
+      checker,
+      verifier,
+      signatures,
+    };
+    localStorage.setItem(`cashAudit_${formattedDate}`, JSON.stringify(data));
+    alert("データが保存されました。");
+  };
+
+  const handleCanvasEnd = (role) => {
+    const canvas = canvasRef.current;
+    const dataURL = canvas.toDataURL();
+    setSignatures((prev) => ({ ...prev, [role]: dataURL }));
+  };
+
+  const clearSignature = (role) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignatures((prev) => ({ ...prev, [role]: "" }));
+    const formattedDate = date.toISOString().split("T")[0];
+    const savedData = JSON.parse(localStorage.getItem(`cashAudit_${formattedDate}`));
+    if (savedData) {
+      savedData.signatures[role] = "";
+      localStorage.setItem(`cashAudit_${formattedDate}`, JSON.stringify(savedData));
+    }
+  };
+
+  const exportCSV = () => {
+    const formattedDate = date.toISOString().split("T")[0];
+    let csvContent = "データ種別,金額\n";
+    Object.entries(bills).forEach(([denom, count]) => {
+      csvContent += `紙幣 ${denom}円,${count}\n`;
+    });
+    Object.entries(coins).forEach(([denom, count]) => {
+      csvContent += `硬貨 ${denom}円,${count}\n`;
+    });
+    Object.entries(rolledCoins).forEach(([denom, count]) => {
+      csvContent += `棒金 ${denom}円,${count * 50}\n`;
+    });
+    csvContent += `チェック者,${checker}\n`;
+    csvContent += `確認者,${verifier}\n`;
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `cashAudit_${formattedDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="p-6 bg-gray-100 text-gray-800">
+      <h1 className="text-2xl font-bold text-blue-gray-700 mb-4">現金実査アプリ</h1>
+      <Button className="w-full bg-green-600 text-white text-lg font-bold py-3 rounded-lg shadow-md mb-2" onClick={exportCSV}>
+        CSVダウンロード
+      </Button>
+      <Card className="mb-4">
+        <CardContent>
+          <h3 className="text-md font-semibold text-blue-gray-700">手書き署名</h3>
+          <canvas ref={canvasRef} className="border border-gray-400 rounded-md bg-white w-full h-24"></canvas>
+          <div className="mt-2 flex space-x-2">
+            <Button className="bg-blue-gray-500 text-white px-4 py-2 rounded-lg" onClick={() => handleCanvasEnd("checker")}>
+              チェック者署名を保存
+            </Button>
+            <Button className="bg-red-500 text-white px-4 py-2 rounded-lg" onClick={() => clearSignature("checker")}>
+              チェック者署名をクリア
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default CashAuditApp;
